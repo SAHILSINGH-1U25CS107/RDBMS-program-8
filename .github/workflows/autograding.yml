@@ -1,0 +1,172 @@
+name: Employee SQL Autograding
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  autograding:
+
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: employeedb
+
+        ports:
+          - 3306:3306
+
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+
+      # Step 1: Get student's files
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+
+      # Step 2: Install MySQL client
+      - name: Install MySQL Client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
+
+
+      # Step 3: Wait for MySQL
+      - name: Wait for MySQL
+        run: |
+          until mysqladmin ping \
+            -h 127.0.0.1 \
+            -uroot \
+            -proot \
+            --silent
+          do
+            echo "Waiting for MySQL..."
+            sleep 2
+          done
+
+
+      # Step 4: Run student's SQL
+      - name: Run Student SQL
+        run: |
+          mysql \
+            -h 127.0.0.1 \
+            -uroot \
+            -proot \
+            employeedb < starter.sql
+
+
+      # Step 5: Run tests
+      - name: Run Tests
+        run: |
+          mysql \
+            -h 127.0.0.1 \
+            -uroot \
+            -proot \
+            employeedb < test.sql > test_output.txt
+
+
+      # Step 6: Display test results
+      - name: Display Test Results
+        run: |
+          cat test_output.txt
+
+
+      # Step 7: Check COUNT()
+      - name: Check COUNT
+        run: |
+          RESULT=$(mysql \
+            -h 127.0.0.1 \
+            -uroot \
+            -proot \
+            employeedb \
+            -N \
+            -e "SELECT COUNT(Salary) FROM Employee;")
+
+          echo "COUNT result: $RESULT"
+
+          if [ "$RESULT" -ne 5 ]; then
+            echo "❌ COUNT() test failed"
+            exit 1
+          fi
+
+          echo "✅ COUNT() test passed"
+
+
+      # Step 8: Check MAX()
+      - name: Check MAX
+        run: |
+          RESULT=$(mysql \
+            -h 127.0.0.1 \
+            -uroot \
+            -proot \
+            employeedb \
+            -N \
+            -e "SELECT MAX(Salary) FROM Employee;")
+
+          echo "MAX result: $RESULT"
+
+          if [ "$RESULT" -ne 45000 ]; then
+            echo "❌ MAX() test failed"
+            exit 1
+          fi
+
+          echo "✅ MAX() test passed"
+
+
+      # Step 9: Check MIN()
+      - name: Check MIN
+        run: |
+          RESULT=$(mysql \
+            -h 127.0.0.1 \
+            -uroot \
+            -proot \
+            employeedb \
+            -N \
+            -e "SELECT MIN(Salary) FROM Employee;")
+
+          echo "MIN result: $RESULT"
+
+          if [ "$RESULT" -ne 25000 ]; then
+            echo "❌ MIN() test failed"
+            exit 1
+          fi
+
+          echo "✅ MIN() test passed"
+
+
+      # Step 10: Check AVG()
+      - name: Check AVG
+        run: |
+          RESULT=$(mysql \
+            -h 127.0.0.1 \
+            -uroot \
+            -proot \
+            employeedb \
+            -N \
+            -e "SELECT AVG(Salary) FROM Employee;")
+
+          echo "AVG result: $RESULT"
+
+          if [ "$RESULT" != "35000.0000" ] && [ "$RESULT" != "35000" ]; then
+            echo "❌ AVG() test failed"
+            exit 1
+          fi
+
+          echo "✅ AVG() test passed"
+
+
+      # Step 11: Final result
+      - name: Final Result
+        run: |
+          echo "================================"
+          echo "🎉 ALL TESTS PASSED!"
+          echo "================================"
